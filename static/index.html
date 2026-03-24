@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>병리팀 PC 보안점수</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#fff; color:#202124; margin:0; }
+  
+  .app { display:flex; height:100vh; }
+  .sidebar { width:240px; border-right:1px solid #e0e0e0; display:flex; flex-direction:column; flex-shrink:0; background:#f8f9fa; }
+  .sidebar-header { padding:16px; border-bottom:1px solid #e0e0e0; }
+  .sidebar-header h1 { font-size:16px; font-weight:600; color:#1a73e8; }
+  .sidebar-nav { padding:8px; border-bottom:1px solid #e0e0e0; }
+  .nav-btn { display:block; width:100%; padding:8px 12px; border:none; background:none; text-align:left; cursor:pointer; border-radius:6px; font-size:13px; color:#5f6368; margin-bottom:2px; }
+  .nav-btn.active { background:#e8f0fe; color:#1a73e8; font-weight:600; }
+  .nav-btn:hover { background:#f1f3f4; }
+  .sidebar-labs { flex:1; overflow-y:auto; padding:8px; }
+  .lab-item { padding:8px 12px; cursor:pointer; border-radius:6px; font-size:13px; color:#5f6368; display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
+  .lab-item.active { background:#e8f0fe; color:#1a73e8; font-weight:600; }
+  .lab-item:hover { background:#f1f3f4; }
+  .badge { font-size:10px; background:#FFF3EB; color:#E87722; padding:2px 6px; border-radius:10px; font-weight:700; }
+  .sidebar-upload { padding:12px; border-top:1px solid #e0e0e0; }
+  .upload-area { border:1px dashed #dadce0; border-radius:8px; padding:12px; text-align:center; cursor:pointer; font-size:12px; color:#5f6368; }
+  .upload-area:hover { border-color:#1a73e8; color:#1a73e8; }
+  .upload-area input { display:none; }
+
+  .main { flex:1; overflow-y:auto; padding:24px; }
+  .stats { display:flex; gap:8px; margin-bottom:14px; }
+  .stat-card { flex:1; padding:8px 12px; border:1px solid #e0e0e0; border-radius:8px; }
+  .stat-card .label { font-size:10px; color:#5f6368; }
+  .stat-card .value { font-size:16px; font-weight:700; margin-top:1px; }
+  .stat-card .value.ok { color:#006272; }
+  .stat-card .value.fail { color:#E87722; }
+  .stat-card .value.none { color:#80868b; }
+
+  .alert { background:#FFF3EB; border:1px solid #F5D4B8; border-radius:8px; padding:12px 16px; margin-bottom:20px; }
+  .alert-title { font-size:13px; font-weight:600; color:#E87722; margin-bottom:8px; }
+  .alert-item { display:inline-block; background:#fff; border-radius:4px; padding:4px 8px; margin:2px; font-size:11px; color:#E87722; cursor:pointer; }
+
+  h2 { font-size:18px; font-weight:600; margin-bottom:4px; }
+  .subtitle { font-size:12px; color:#5f6368; margin-bottom:16px; }
+  .divider { border:none; border-top:1px solid #e0e0e0; margin:20px 0; }
+
+  /* Grid */
+  .grid-container { display:inline-block; overflow:visible; }
+  .grid-row { display:flex; gap:8px; margin-bottom:8px; overflow:visible; }
+  .grid-cell { display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; cursor:default; position:relative; transition: all 0.15s; }
+  .grid-cell.empty { border:1px dashed transparent; border-radius:6px; }
+  .grid-cell.empty.admin { border-color:#dadce0; cursor:pointer; }
+  .grid-cell.empty.admin:hover { border-color:#1a73e8; background:#e8f0fe; }
+  .grid-cell.empty.drop-target { border-color:#1a73e8; background:#e8f0fe; }
+  .grid-cell.pc { cursor:grab; }
+  .grid-cell.pc.dragging { opacity:0.4; }
+  .grid-cell.pc.selected { box-shadow: 0 0 0 3px #1a73e8; }
+  .grid-cell .pc-icon { display:flex; align-items:center; justify-content:center; }
+  .grid-cell .ip-label { font-size:13px; color:#5f6368; white-space:nowrap; font-family:monospace; margin-top:1px; line-height:1; }
+  .grid-cell .memo-badge { position:absolute; top:2px; right:2px; width:14px; height:14px; border-radius:50%; background:#E87722; color:#fff; font-size:8px; font-weight:700; display:flex; align-items:center; justify-content:center; line-height:1; }
+  .grid-cell .memo-tip { display:none; position:absolute; bottom:calc(100% + 8px); left:0; transform:none; background:#323232; color:#fff; padding:8px 12px; border-radius:6px; font-size:12px; z-index:1000; pointer-events:none; line-height:1.5; width:200px; white-space:pre-wrap; word-break:break-word; }
+  .grid-cell .memo-tip::after { content:''; position:absolute; top:100%; left:16px; transform:none; border:5px solid transparent; border-top-color:#323232; }
+  .grid-cell:hover .memo-tip { display:block; }
+  .grid-cell.multi-selected { box-shadow: 0 0 0 3px #E87722; }
+  .grid-cell.pc { position:relative; }
+
+  /* Tiles */
+  .tiles { display:flex; flex-wrap:wrap; gap:16px; }
+  .tile { border:1px solid #e0e0e0; border-radius:12px; padding:16px; cursor:pointer; min-width:200px; transition: all 0.15s; }
+  .tile:hover { border-color:#1a73e8; transform:translateY(-1px); }
+  .tile.has-fail { border-color:#F5D4B8; }
+  .tile-header { display:flex; justify-content:space-between; margin-bottom:10px; font-size:13px; }
+  .tile-name { font-weight:600; }
+  .tile-count { color:#5f6368; }
+
+  /* PC info panel */
+  .pc-info { background:#f8f9fa; border-radius:8px; padding:12px 16px; margin-top:16px; display:flex; gap:20px; align-items:center; font-size:12px; }
+  .pc-info .field { color:#5f6368; }
+  .pc-info .val { color:#202124; font-weight:500; }
+
+  /* Admin forms */
+  .form-row { display:flex; gap:8px; margin-bottom:8px; align-items:flex-end; }
+  .form-group { display:flex; flex-direction:column; }
+  .form-group label { font-size:11px; color:#5f6368; margin-bottom:4px; }
+  .form-group input, .form-group select { padding:6px 10px; border:1px solid #dadce0; border-radius:4px; font-size:13px; outline:none; }
+  .form-group input:focus, .form-group select:focus { border-color:#1a73e8; }
+  .btn { padding:6px 16px; border:none; border-radius:6px; font-size:12px; cursor:pointer; font-weight:600; }
+  .btn-primary { background:#1a73e8; color:#fff; }
+  .btn-primary:hover { background:#1557b0; }
+  .btn-danger { background:#fff; color:#E87722; border:1px solid #E87722; }
+  .btn-danger:hover { background:#FFF3EB; }
+  .btn-outline { background:#fff; color:#1a73e8; border:1px solid #1a73e8; }
+  .btn-outline:hover { background:#e8f0fe; }
+
+  .admin-section { border:1px solid #e0e0e0; border-radius:12px; padding:20px; margin-bottom:16px; }
+  .admin-section h3 { font-size:14px; font-weight:600; margin-bottom:12px; }
+
+  table.data { width:100%; border-collapse:collapse; font-size:12px; }
+  table.data th { text-align:left; padding:8px 12px; color:#5f6368; border-bottom:1px solid #e0e0e0; font-weight:500; }
+  table.data td { padding:8px 12px; border-bottom:1px solid #f1f3f4; }
+
+  .tabs { display:flex; gap:0; border-bottom:1px solid #e0e0e0; margin-bottom:16px; }
+  .tab { padding:8px 20px; cursor:pointer; font-size:13px; color:#5f6368; border-bottom:2px solid transparent; }
+  .tab.active { color:#1a73e8; border-bottom-color:#1a73e8; font-weight:600; }
+  .tab:hover { background:#f8f9fa; }
+
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#323232; color:#fff; padding:10px 24px; border-radius:8px; font-size:13px; z-index:999; }
+
+  /* Admin split layout */
+  .admin-split { display:flex; gap:0; height:calc(100vh - 100px); overflow:hidden; }
+  .admin-left { width:280px; flex-shrink:0; border-right:1px solid #e0e0e0; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .admin-right { flex:1; overflow-y:auto; padding:16px; }
+  .lab-list-item { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:6px; cursor:pointer; font-size:13px; color:#5f6368; border:1px solid transparent; }
+  .lab-list-item:hover { background:#f1f3f4; }
+  .lab-list-item.active { background:#e8f0fe; color:#1a73e8; border-color:#c5d9f7; font-weight:600; }
+  .lab-list-item.drop-target { background:#E5F2F3; border-color:#006272; color:#006272; font-weight:600; box-shadow:0 0 0 2px #006272; }
+  .lab-list-item .lab-item-name { flex:1; }
+  .lab-list-item .lab-item-meta { font-size:10px; color:#80868b; margin-left:6px; }
+  .lab-list-item.active .lab-item-meta { color:#1a73e8; opacity:0.7; }
+  .lab-inline-edit { padding:8px 10px; background:#f8f9fa; border-radius:6px; border:1px solid #dadce0; margin-top:2px; }
+  .lab-inline-edit .grid-inputs { display:flex; align-items:center; gap:4px; margin-top:6px; font-size:12px; color:#5f6368; }
+  .grid-num-input { width:44px; padding:3px 6px; border:1px solid #dadce0; border-radius:4px; font-size:12px; text-align:center; }
+  .grid-num-input:focus { border-color:#1a73e8; outline:none; }
+  .lab-add-form { border:1px dashed #dadce0; border-radius:8px; padding:12px; }
+  .lab-add-form h4 { font-size:12px; color:#5f6368; margin-bottom:8px; font-weight:600; }
+  .displaced-banner { background:#FFF3EB; border:1px solid #F5D4B8; border-radius:6px; padding:8px 12px; font-size:12px; color:#E87722; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+const API = window.location.origin + '/api';
+
+function api(path, opts={}) {
+  const token = localStorage.getItem('token');
+  const headers = { 'Content-Type': 'application/json', ...opts.headers };
+  if (token) headers['X-Token'] = token;
+  return fetch(API + path, { ...opts, headers })
+    .then(r => {
+      if (r.status === 401) {
+        localStorage.removeItem('token');
+        window.location.reload();
+        return;
+      }
+      if (!r.ok) return r.json().then(e => { console.error('API Error', path, e); throw e; });
+      return r.json();
+    });
+}
+
+// ── PC Icon ──
+function PcIcon({ color, size, score, isFail }) {
+  const s = Math.round(size * 0.45);
+  const filled = size <= 30;
+  if (filled) {
+    const html = `<svg width="${s}" height="${s}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="13" rx="2" fill="${color}"/><path d="M7 7 L11 10 L17 6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="8" y1="20" x2="16" y2="20" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><line x1="12" y1="16" x2="12" y2="20" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+    return <span className="pc-icon" dangerouslySetInnerHTML={{__html: html}} />;
+  }
+  const screenFill = isFail ? '#FFF3EB' : 'none';
+  let inner = '';
+  if (isFail && score != null) {
+    inner = `<text x="12" y="12.5" text-anchor="middle" font-size="9" font-weight="700" fill="#E87722" font-family="monospace">${score}</text>`;
+  } else {
+    inner = `<path d="M7 7 L11 10 L17 6" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+  }
+  const html = `<svg width="${s}" height="${s}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="13" rx="2" stroke="${color}" stroke-width="1.8" fill="${screenFill}"/>${inner}<line x1="8" y1="20" x2="16" y2="20" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="16" x2="12" y2="20" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+  return <span className="pc-icon" dangerouslySetInnerHTML={{__html: html}} />;
+}
+
+// ── Grid Cell ──
+function Cell({ pc, score, size, showLabel, isAdmin, onDragStart, onDragOver, onDrop, onDragEnd, onClick, onDblClick, selected, multiSelected, dragOver }) {
+  if (!pc) {
+    return (
+      <div
+        className={`grid-cell empty ${isAdmin ? 'admin' : ''} ${dragOver ? 'drop-target' : ''}`}
+        style={{ width: size, height: size, borderRadius: 6 }}
+        onDragOver={isAdmin ? onDragOver : undefined}
+        onDrop={isAdmin ? onDrop : undefined}
+        onClick={isAdmin ? onClick : undefined}
+      />
+    );
+  }
+  const s = score;
+  const isOk = s != null && s === 100;
+  const isFail = s != null && s < 100;
+  const noScore = s == null;
+  const end = pc.ip_address.split('.').pop();
+  const bg = noScore ? '#f1f3f4' : isOk ? '#E5F2F3' : '#FFF3EB';
+  const border = noScore ? '#dadce0' : isOk ? '#006272' : '#E87722';
+  const color = noScore ? '#80868b' : isOk ? '#006272' : '#E87722';
+  const hasMemo = pc.memo && pc.memo.trim();
+
+  return (
+    <div
+      className={`grid-cell pc ${selected ? 'selected' : ''} ${multiSelected ? 'multi-selected' : ''}`}
+      style={{ width: size, height: size, background: bg, border: `2px solid ${border}`, borderRadius: 6, padding: 0, overflow: 'visible' }}
+      draggable={isAdmin}
+      onDragStart={isAdmin ? (e) => onDragStart(e, pc) : undefined}
+      onDragEnd={isAdmin ? onDragEnd : undefined}
+      onClick={(e) => onClick && onClick(pc, e)}
+      onDoubleClick={(e) => { e.stopPropagation(); onDblClick && onDblClick(pc); }}
+    >
+      {!isAdmin && hasMemo && <div className="memo-tip">{pc.memo}</div>}
+      {hasMemo && <div className="memo-badge">M</div>}
+      <PcIcon color={color} size={size} score={s} isFail={isFail} />
+      {showLabel && <span className="ip-label">.{end}</span>}
+    </div>
+  );
+}
+
+// ── Grid ──
+function Grid({ lab, pcs, scores, size=80, showLabel=true, isAdmin=false, selectedPc, selectedPcs, onPcClick, onDblClick, onMovePc, onMovePcs, onAddPcAt, onDragPcStart, onDragPcEnd }) {
+  const [dragPc, setDragPc] = useState(null);
+  const [dragOverCell, setDragOverCell] = useState(null);
+  const pcMap = {};
+  pcs.forEach(p => { pcMap[`${p.grid_row}-${p.grid_col}`] = p; });
+
+  const isDraggingMulti = dragPc && selectedPcs && selectedPcs.length > 1 && selectedPcs.some(sp => sp.pc_id === dragPc.pc_id);
+
+  const handleDragStart = (e, pc) => {
+    setDragPc(pc);
+    e.dataTransfer.effectAllowed = 'move';
+    if (onDragPcStart) onDragPcStart(pc.pc_id);
+  };
+  const handleDragEnd = () => {
+    setDragPc(null);
+    setDragOverCell(null);
+    if (onDragPcEnd) onDragPcEnd();
+  };
+  const handleDragOver = (e, r, c) => { e.preventDefault(); setDragOverCell(`${r}-${c}`); };
+  const handleDrop = (e, r, c) => {
+    e.preventDefault();
+    e.stopPropagation(); // LabsAdmin의 onDrop으로 버블링 차단
+    setDragOverCell(null);
+    if (!dragPc) return;
+    if (isDraggingMulti && onMovePcs) {
+      onMovePcs(selectedPcs, r, c, dragPc);
+    } else if (onMovePc) {
+      onMovePc(dragPc.pc_id, r, c);
+    }
+    setDragPc(null);
+    if (onDragPcEnd) onDragPcEnd(); // ref도 즉시 초기화
+  };
+
+  return (
+    <div className="grid-container">
+      {Array.from({ length: lab.grid_rows }, (_, r) => (
+        <div key={r} className="grid-row">
+          {Array.from({ length: lab.grid_cols }, (_, c) => {
+            const pc = pcMap[`${r}-${c}`];
+            const isMultiSel = pc && selectedPcs && selectedPcs.some(sp => sp.pc_id === pc.pc_id);
+            return (
+              <Cell
+                key={c} pc={pc} score={pc ? scores[pc.ip_address] : null}
+                size={size} showLabel={showLabel} isAdmin={isAdmin}
+                selected={selectedPc && pc && selectedPc.pc_id === pc.pc_id}
+                multiSelected={isMultiSel}
+                dragOver={dragOverCell === `${r}-${c}` && !pc}
+                onDragStart={handleDragStart}
+                onDragOver={(e) => handleDragOver(e, r, c)}
+                onDrop={(e) => handleDrop(e, r, c)}
+                onDragEnd={handleDragEnd}
+                onClick={pc ? (pc2, e) => onPcClick && onPcClick(pc2, e)
+                             : () => isAdmin && onAddPcAt && onAddPcAt(r, c)}
+                onDblClick={isAdmin && onDblClick ? (pc2) => onDblClick(pc2) : undefined}
+              />
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── App ──
+function App() {
+  const [user, setUser] = useState(null);         // 로그인된 사용자 정보
+  const [authChecked, setAuthChecked] = useState(false); // 초기 인증 확인 완료 여부
+  const [labs, setLabs] = useState([]);
+  const [pcs, setPcs] = useState([]);
+  const [scores, setScores] = useState({});
+  const [lastUpload, setLastUpload] = useState(null);
+  const [page, setPage] = useState('view');
+  const [selectedLab, setSelectedLab] = useState(null);
+  const [selectedPc, setSelectedPc] = useState(null);
+  const [adminLab, setAdminLab] = useState(null);
+  const [draggingPcId, setDraggingPcId] = useState(null);
+  const draggingPcIdRef = useRef(null);
+  const [toast, setToast] = useState('');
+  const [addPcCell, setAddPcCell] = useState(null);
+  const fileRef = useRef(null);
+  const initRef = useRef(null);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+  // 초기 로그인 상태 확인
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      api('/me').then(u => { if (u) { setUser(u); } setAuthChecked(true); })
+               .catch(() => { localStorage.removeItem('token'); setAuthChecked(true); });
+    } else {
+      setAuthChecked(true);
+    }
+  }, []);
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+    // 일반 사용자는 자기 검사실로 바로 이동
+    if (userData.role !== 'admin' && userData.lab_id) {
+      setSelectedLab(userData.lab_id);
+    }
+  };
+
+  const handleLogout = async () => {
+    await api('/logout', { method: 'POST' });
+    localStorage.removeItem('token');
+    setUser(null);
+    setLabs([]); setPcs([]); setScores({});
+  };
+
+  const reload = useCallback(() => {
+    api('/labs').then(d => { if(d) setLabs(d); });
+    api('/pcs').then(d => { if(d) setPcs(d); });
+    api('/scores').then(d => { if(d) setScores(d); });
+    api('/upload-history').then(d => { if(d) setLastUpload(d); });
+  }, []);
+
+  useEffect(() => { if (user) reload(); }, [user, reload]);
+
+  // Helpers
+  const labPcs = (labId) => pcs.filter(p => p.lab_id === labId);
+  const failCount = (labId) => labPcs(labId).filter(p => scores[p.ip_address] != null && scores[p.ip_address] < 100).length;
+  const noneCount = (labId) => labPcs(labId).filter(p => scores[p.ip_address] == null).length;
+
+  const allTarget = selectedLab ? pcs.filter(p => p.lab_id === selectedLab) : pcs;
+  const total = allTarget.length;
+  const ok = allTarget.filter(p => scores[p.ip_address] === 100).length;
+  const fail = allTarget.filter(p => scores[p.ip_address] != null && scores[p.ip_address] < 100).length;
+  const none = total - ok - fail;
+  const failPcs = allTarget.filter(p => scores[p.ip_address] != null && scores[p.ip_address] < 100);
+
+  // Upload
+  const handleScoreUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(API + '/upload-scores', { method: 'POST', body: fd });
+    const data = await r.json();
+    showToast(`매칭 ${data.matched}건 / 미매칭 ${data.unmatched}건`);
+    reload();
+    e.target.value = '';
+  };
+
+  const handleInitUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(API + '/import-excel', { method: 'POST', body: fd });
+    const data = await r.json();
+    showToast(`${data.labs}개 검사실, ${data.pcs}대 PC 등록`);
+    reload();
+    e.target.value = '';
+  };
+
+  // PC Transfer (검사실 간 이동)
+  const handleTransferPc = async (pcId, targetLabId) => {
+    const pc = pcs.find(p => p.pc_id === pcId);
+    if (!pc || pc.lab_id === targetLabId) return;
+    const targetLab = labs.find(l => l.lab_id === targetLabId);
+    const fromLab = labs.find(l => l.lab_id === pc.lab_id);
+    if (!targetLab) return;
+
+    // 목적지 검사실의 빈 셀 찾기
+    const targetPcs = pcs.filter(p => p.lab_id === targetLabId);
+    const occupied = new Set(targetPcs.map(p => `${p.grid_row}-${p.grid_col}`));
+    let freeRow = -1, freeCol = -1;
+    outer: for (let r = 0; r < targetLab.grid_rows; r++) {
+      for (let c = 0; c < targetLab.grid_cols; c++) {
+        if (!occupied.has(`${r}-${c}`)) { freeRow = r; freeCol = c; break outer; }
+      }
+    }
+    if (freeRow === -1) {
+      showToast(`⚠ ${targetLab.lab_name} 그리드가 꽉 찼습니다`);
+      return;
+    }
+
+    // 메모에 이전 이력 자동 추가
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const note = `[${ym} ${fromLab?.lab_name||pc.lab_id}→${targetLab.lab_name}]`;
+    const newMemo = pc.memo ? `${pc.memo}\n${note}` : note;
+
+    try {
+      await api(`/pcs/${pcId}`, { method: 'PUT', body: JSON.stringify({
+        lab_id: targetLabId, grid_row: freeRow, grid_col: freeCol, memo: newMemo
+      })});
+      showToast(`${pc.ip_address} → ${targetLab.lab_name} 이동`);
+      reload();
+    } catch(e) {
+      showToast(`⚠ 이동 실패: ${e.detail || '서버 오류'}`);
+    }
+  };
+
+  // PC Move (drag)
+  const handleMovePc = async (pcId, newRow, newCol) => {
+    await api(`/pcs/${pcId}/move`, { method: 'PUT', body: JSON.stringify({ grid_row: newRow, grid_col: newCol }) });
+    reload();
+  };
+
+  // PC Multi Move (drag multiple)
+  const handleMovePcs = async (selectedPcsList, dropRow, dropCol, draggedPc) => {
+    const dr = dropRow - draggedPc.grid_row;
+    const dc = dropCol - draggedPc.grid_col;
+    for (const pc of selectedPcsList) {
+      const nr = pc.grid_row + dr;
+      const nc = pc.grid_col + dc;
+      if (nr >= 0 && nc >= 0) {
+        await api(`/pcs/${pc.pc_id}/move`, { method: 'PUT', body: JSON.stringify({ grid_row: nr, grid_col: nc }) });
+      }
+    }
+    reload();
+  };
+
+  // PC Add at cell
+  const handleAddPcAt = (row, col) => {
+    setAddPcCell({ row, col });
+  };
+
+  const submitAddPc = async (ip, name, loc, det, memo) => {
+    if (!ip.trim()) return;
+    const labId = adminLab || (labs[0] && labs[0].lab_id);
+    await api('/pcs', { method: 'POST', body: JSON.stringify({
+      ip_address: ip, pc_name: name, lab_id: labId,
+      grid_row: addPcCell.row, grid_col: addPcCell.col, location: loc, detail: det, memo: memo || ''
+    })});
+    setAddPcCell(null);
+    showToast('PC 추가됨');
+    reload();
+  };
+
+  // PC Delete
+  const handleDeletePc = async (pcId) => {
+    await api(`/pcs/${pcId}`, { method: 'DELETE' });
+    setSelectedPc(null);
+    showToast('삭제됨');
+    reload();
+  };
+
+  // PC Update
+  const handleUpdatePc = async (pcId, data) => {
+    await api(`/pcs/${pcId}`, { method: 'PUT', body: JSON.stringify(data) });
+    setSelectedPc(null);
+    showToast('저장됨');
+    reload();
+  };
+
+  // Lab CRUD
+  const handleAddLab = async (name, rows, cols) => {
+    await api('/labs', { method: 'POST', body: JSON.stringify({ lab_name: name, grid_rows: rows, grid_cols: cols }) });
+    showToast('검사실 추가됨');
+    reload();
+  };
+  const handleUpdateLab = async (labId, data) => {
+    // 그리드 축소 시 범위 밖 PC 자동 재배치
+    if (data.grid_rows != null || data.grid_cols != null) {
+      const lab = labs.find(l => l.lab_id === labId);
+      if (lab) {
+        const newRows = data.grid_rows ?? lab.grid_rows;
+        const newCols = data.grid_cols ?? lab.grid_cols;
+        const labPcList = pcs.filter(p => p.lab_id === labId);
+        const outOfBound = labPcList.filter(p => p.grid_row >= newRows || p.grid_col >= newCols);
+        if (outOfBound.length > 0) {
+          // 활성 영역 내 이미 사용 중인 셀
+          const inBound = labPcList.filter(p => p.grid_row < newRows && p.grid_col < newCols);
+          const occupied = new Set(inBound.map(p => `${p.grid_row}-${p.grid_col}`));
+          // 재배치 대상 PC를 빈 셀에 순서대로 넣기
+          const toPlace = [...outOfBound];
+          let displaced = 0;
+          for (let r = 0; r < newRows && toPlace.length > 0; r++) {
+            for (let c = 0; c < newCols && toPlace.length > 0; c++) {
+              if (!occupied.has(`${r}-${c}`)) {
+                const pc = toPlace.shift();
+                occupied.add(`${r}-${c}`);
+                await api(`/pcs/${pc.pc_id}/move`, { method: 'PUT', body: JSON.stringify({ grid_row: r, grid_col: c }) });
+                displaced++;
+              }
+            }
+          }
+          if (displaced > 0) showToast(`그리드 축소: ${displaced}대 자동 재배치됨`);
+        }
+      }
+    }
+    await api(`/labs/${labId}`, { method: 'PUT', body: JSON.stringify(data) });
+    showToast('저장됨');
+    reload();
+  };
+  const handleDeleteLab = async (labId) => {
+    await api(`/labs/${labId}`, { method: 'DELETE' });
+    showToast('삭제됨');
+    reload();
+  };
+
+  const currentLab = labs.find(l => l.lab_id === (page === 'admin' ? adminLab : selectedLab));
+
+  // 로그인 안 된 상태
+  if (!authChecked) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'#5f6368',fontSize:14}}>로딩 중...</div>;
+  if (!user) return <LoginPage onLogin={handleLogin} />;
+
+  const isAdmin = user.role === 'admin';
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="sidebar-header"><h1>🔒 보안점수 관리</h1></div>
+        <div className="sidebar-nav">
+          <button className={`nav-btn ${page==='view'?'active':''}`} onClick={() => setPage('view')}>📊 보안점수 조회</button>
+          <button className={`nav-btn ${page==='admin'?'active':''}`} onClick={() => setPage('admin')}>⚙️ 관리</button>
+          {isAdmin && <button className={`nav-btn ${page==='users'?'active':''}`} onClick={() => setPage('users')}>👤 사용자 관리</button>}
+        </div>
+        <div className="sidebar-labs">
+          <div style={{fontSize:10,color:'#80868b',padding:'4px 12px',marginBottom:4}}>검사실</div>
+          <div className={`lab-item ${!selectedLab&&page==='view'?'active':''}`}
+               onClick={() => { setSelectedLab(null); setPage('view'); }}>전체</div>
+          {labs.map(l => (
+            <div key={l.lab_id}
+                 className={`lab-item ${selectedLab===l.lab_id&&page==='view'?'active':''}`}
+                 onClick={() => { setSelectedLab(l.lab_id); setPage('view'); setSelectedPc(null); }}>
+              <span>{l.lab_name}</span>
+              {failCount(l.lab_id) > 0 && <span className="badge">{failCount(l.lab_id)}</span>}
+            </div>
+          ))}
+        </div>
+        <div className="sidebar-upload">
+          {isAdmin && (labs.length === 0 ? (
+            <div className="upload-area" onClick={() => initRef.current?.click()}>
+              📄 초기 엑셀 업로드<br/><small>검사실/PC 자동 등록</small>
+              <input ref={initRef} type="file" accept=".xlsx,.xls" onChange={handleInitUpload} />
+            </div>
+          ) : (
+            <div className="upload-area" onClick={() => fileRef.current?.click()}>
+              📄 보안점수 엑셀 업로드
+              <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleScoreUpload} />
+            </div>
+          ))}
+          {lastUpload && lastUpload.upload_date && (
+            <div style={{fontSize:10,color:'#80868b',marginTop:6,textAlign:'center'}}>최근: {lastUpload.upload_date}</div>
+          )}
+          {/* 사용자 정보 + 로그아웃 */}
+          <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid #e0e0e0'}}>
+            <div style={{fontSize:12,color:'#5f6368',marginBottom:6}}>
+              <span style={{fontWeight:600,color:'#202124'}}>{user.username}</span>
+              <span style={{marginLeft:6,fontSize:10,background:isAdmin?'#e8f0fe':'#f1f3f4',color:isAdmin?'#1a73e8':'#5f6368',padding:'1px 6px',borderRadius:8,fontWeight:600}}>
+                {isAdmin ? '관리자' : user.lab_id}
+              </span>
+            </div>
+            <button className="btn btn-outline" style={{width:'100%',fontSize:11,padding:'5px'}} onClick={handleLogout}>로그아웃</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div className="main">
+        {page === 'view' && (
+          <>
+            {labs.length === 0 ? (
+              <div style={{textAlign:'center',padding:'60px',color:'#5f6368'}}>
+                <p style={{fontSize:16}}>사이드바에서 엑셀을 업로드하여 시작하세요.</p>
+              </div>
+            ) : (
+              <>
+                {selectedLab && <div style={{fontSize:12,color:'#1a73e8',cursor:'pointer',marginBottom:4}} onClick={() => setSelectedLab(null)}>← 전체로</div>}
+                <h2>{selectedLab ? currentLab?.lab_name : '전체 현황'}</h2>
+                <div className="subtitle">{selectedLab ? `${currentLab?.grid_rows}×${currentLab?.grid_cols} 그리드` : `${labs.length}개 검사실`}</div>
+
+                <div className="stats">
+                  {lastUpload && lastUpload.upload_date && (
+                    <div className="stat-card" style={{background:'#f8f9fa',borderColor:'#dadce0',flexShrink:0,minWidth:'fit-content'}}>
+                      <div className="label">📅 점수 기준일</div>
+                      <div style={{fontSize:13,fontWeight:600,color:'#5f6368',marginTop:1}}>{lastUpload.upload_date.slice(0,16)}</div>
+                    </div>
+                  )}
+                  <div className="stat-card"><div className="label">전체</div><div className="value">{total}대</div></div>
+                  <div className="stat-card"><div className="label">정상</div><div className="value ok">{ok}대</div></div>
+                  <div className="stat-card"><div className="label">미달</div><div className="value fail">{fail}대</div></div>
+                  <div className="stat-card"><div className="label">미등록</div><div className="value none">{none}대</div></div>
+                </div>
+
+                {fail > 0 && (
+                  <div className="alert">
+                    <div className="alert-title">⚠ 보안 미달 PC {fail}대</div>
+                    {failPcs.map(p => {
+                      const ln = labs.find(l=>l.lab_id===p.lab_id)?.lab_name||'';
+                      return <span key={p.pc_id} className="alert-item" onClick={() => { setSelectedLab(p.lab_id); setSelectedPc(p); }}>
+                        {ln} · {p.ip_address} ({scores[p.ip_address]}점)
+                      </span>;
+                    })}
+                  </div>
+                )}
+
+                <hr className="divider" />
+
+                {!selectedLab ? (
+                  <div className="tiles">
+                    {labs.map(l => {
+                      const lp = labPcs(l.lab_id);
+                      const lf = failCount(l.lab_id);
+                      return (
+                        <div key={l.lab_id} className={`tile ${lf>0?'has-fail':''}`} onClick={() => setSelectedLab(l.lab_id)}>
+                          <div className="tile-header">
+                            <span className="tile-name">{l.lab_name}</span>
+                            <span className="tile-count">{lp.length}대{lf>0?` · ${lf} 미달`:''}</span>
+                          </div>
+                          <Grid lab={l} pcs={lp} scores={scores} size={24} showLabel={false} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <>
+                    <div style={{marginBottom:8,fontSize:12,color:'#5f6368'}}>🟢 정상 · 🔴 미달 · ⚪ 미등록 · 마우스를 올리면 상세</div>
+                    <Grid lab={currentLab} pcs={labPcs(currentLab.lab_id)} scores={scores}
+                          size={80} showLabel={true} selectedPc={selectedPc}
+                          onPcClick={(pc) => setSelectedPc(selectedPc?.pc_id===pc.pc_id ? null : pc)} />
+                    {selectedPc && (
+                      <div className="pc-info">
+                        <div><span className="field">PC명: </span><span className="val">{selectedPc.pc_name}</span></div>
+                        <div><span className="field">IP: </span><span className="val" style={{fontFamily:'monospace'}}>{selectedPc.ip_address}</span></div>
+                        <div><span className="field">점수: </span><span className="val" style={{color: scores[selectedPc.ip_address]===100?'#006272':'#E87722', fontWeight:700}}>
+                          {scores[selectedPc.ip_address] ?? '미등록'}</span></div>
+                        <div><span className="field">위치: </span><span className="val">{selectedPc.location} {selectedPc.detail}</span></div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {page === 'admin' && (
+          <>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div>
+                <h2>⚙️ 관리</h2>
+                <div className="subtitle">
+                  {isAdmin ? '검사실 선택 후 PC 배치를 바로 편집할 수 있습니다' : `담당 검사실(${user.lab_id}) PC 배치를 편집할 수 있습니다`}
+                </div>
+              </div>
+              {isAdmin && <ResetAdmin onDone={reload} showToast={showToast} inline={true} />}
+            </div>
+            <div className="admin-split">
+              {/* 좌측: 검사실 목록 - 관리자는 전체, 일반은 읽기전용 목록 */}
+              {isAdmin ? (
+                <LabsAdmin labs={labs} pcs={pcs} onAdd={handleAddLab} onUpdate={handleUpdateLab} onDelete={handleDeleteLab}
+                           adminLab={adminLab} setAdminLab={(id) => { setAdminLab(id); setAddPcCell(null); }}
+                           draggingPcId={draggingPcId} draggingPcIdRef={draggingPcIdRef} onTransferPc={handleTransferPc} />
+              ) : (
+                <div className="admin-left">
+                  <div style={{fontSize:12,fontWeight:600,color:'#5f6368',marginBottom:8}}>검사실 목록</div>
+                  {labs.map(l => (
+                    <div key={l.lab_id}
+                         className={`lab-list-item ${adminLab===l.lab_id?'active':''} ${l.lab_id===user.lab_id?'':'readonly'}`}
+                         onClick={() => { if(l.lab_id===user.lab_id || isAdmin) { setAdminLab(l.lab_id); setAddPcCell(null); } }}
+                         style={{cursor: l.lab_id===user.lab_id ? 'pointer' : 'default', opacity: l.lab_id===user.lab_id ? 1 : 0.45}}>
+                      <span className="lab-item-name">{l.lab_name}</span>
+                      <span className="lab-item-meta">{pcs.filter(p=>p.lab_id===l.lab_id).length}대</span>
+                      {l.lab_id===user.lab_id && <span style={{fontSize:9,background:'#E5F2F3',color:'#006272',padding:'1px 5px',borderRadius:8,fontWeight:700}}>담당</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* 우측: PC 배치 - 자기 검사실만 편집 가능 */}
+              <div className="admin-right"
+                onDragOver={e => e.stopPropagation()}
+                onDrop={e => e.stopPropagation()}
+              >
+                <PcsAdmin labs={labs} pcs={pcs} scores={scores}
+                          adminLab={adminLab || (isAdmin ? null : user.lab_id)}
+                          setAdminLab={(id) => { setAdminLab(id); setAddPcCell(null); }}
+                          onMovePc={handleMovePc} onMovePcs={handleMovePcs}
+                          onDeletePc={handleDeletePc}
+                          onUpdatePc={handleUpdatePc} addPcCell={addPcCell}
+                          onAddPcAt={isAdmin || adminLab===user.lab_id ? handleAddPcAt : null}
+                          onSubmitAddPc={submitAddPc}
+                          onCancelAdd={() => setAddPcCell(null)}
+                          isReadOnly={!isAdmin && adminLab !== user.lab_id}
+                          onDragPcStart={(pcId) => { setDraggingPcId(pcId); draggingPcIdRef.current = pcId; }}
+                          onDragPcEnd={() => { setDraggingPcId(null); draggingPcIdRef.current = null; }} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {page === 'users' && isAdmin && (
+          <UsersAdmin labs={labs} showToast={showToast} />
+        )}
+      </div>
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+// ── Labs Admin (좌측 패널) ──
+function LabsAdmin({ labs, pcs, onAdd, onUpdate, onDelete, adminLab, setAdminLab, draggingPcId, draggingPcIdRef, onTransferPc }) {
+  const [name, setName] = useState('');
+  const [rows, setRows] = useState(4);
+  const [cols, setCols] = useState(8);
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editRows, setEditRows] = useState(4);
+  const [editCols, setEditCols] = useState(8);
+  const [dropTargetId, setDropTargetId] = useState(null);
+
+  const startEdit = (lab, e) => {
+    e.stopPropagation();
+    setEditingId(lab.lab_id);
+    setEditName(lab.lab_name);
+    setEditRows(lab.grid_rows);
+    setEditCols(lab.grid_cols);
+  };
+
+  const saveEdit = async (labId, e) => {
+    e.stopPropagation();
+    await onUpdate(labId, { lab_name: editName, grid_rows: editRows, grid_cols: editCols });
+    setEditingId(null);
+  };
+
+  const handleDragOver = (e, labId) => {
+    if (!draggingPcId) return;
+    e.preventDefault();
+    setDropTargetId(labId);
+  };
+
+  const handleDragLeave = () => setDropTargetId(null);
+
+  const handleDrop = (e, labId) => {
+    e.preventDefault();
+    setDropTargetId(null);
+    // dragEnd보다 drop이 먼저 실행되지만 타이밍 이슈 방지를 위해 ref 우선 사용
+    const pcId = (draggingPcIdRef && draggingPcIdRef.current) || draggingPcId;
+    if (pcId && onTransferPc) onTransferPc(pcId, labId);
+  };
+
+  return (
+    <div className="admin-left">
+      <div style={{fontSize:12,fontWeight:600,color:'#5f6368',marginBottom:4}}>
+        검사실 목록
+        {draggingPcId && <span style={{marginLeft:8,fontSize:11,color:'#1a73e8',fontWeight:400}}>↓ 검사실에 놓아 이동</span>}
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:4}}>
+        {labs.map(l => {
+          const pcCnt = pcs.filter(p => p.lab_id === l.lab_id).length;
+          const isActive = adminLab === l.lab_id;
+          const isEditing = editingId === l.lab_id;
+          const isDropTarget = dropTargetId === l.lab_id;
+
+          return (
+            <div key={l.lab_id}
+              onDragOver={(e) => handleDragOver(e, l.lab_id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, l.lab_id)}
+            >
+              <div className={`lab-list-item ${isActive ? 'active' : ''} ${isDropTarget ? 'drop-target' : ''}`}
+                   onClick={() => setAdminLab(l.lab_id)}>
+                <span className="lab-item-name">
+                  {isEditing
+                    ? <input value={editName} onChange={e => setEditName(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        style={{width:'100%',padding:'2px 4px',border:'1px solid #dadce0',borderRadius:3,fontSize:13}}/>
+                    : l.lab_name}
+                </span>
+                <span className="lab-item-meta">{l.grid_rows}×{l.grid_cols} / {pcCnt}대</span>
+                {!isEditing && (
+                  <button onClick={(e) => startEdit(l, e)}
+                    style={{marginLeft:4,padding:'1px 6px',border:'1px solid #dadce0',borderRadius:3,background:'#fff',fontSize:11,cursor:'pointer',color:'#5f6368'}}>
+                    수정
+                  </button>
+                )}
+              </div>
+
+              {isEditing && (
+                <div className="lab-inline-edit">
+                  <div className="grid-inputs">
+                    <span>행</span>
+                    <input type="number" className="grid-num-input" value={editRows}
+                      onChange={e => setEditRows(Math.max(1, +e.target.value))} min={1} max={30} />
+                    <span>× 열</span>
+                    <input type="number" className="grid-num-input" value={editCols}
+                      onChange={e => setEditCols(Math.max(1, +e.target.value))} min={1} max={30} />
+                    <span style={{marginLeft:4,fontSize:10,color:'#80868b'}}>= {editRows*editCols}셀</span>
+                  </div>
+                  {(() => {
+                    const outCnt = pcs.filter(p => p.lab_id === l.lab_id && (p.grid_row >= editRows || p.grid_col >= editCols)).length;
+                    return outCnt > 0 ? (
+                      <div style={{marginTop:6,fontSize:11,color:'#E87722',background:'#FFF8F0',padding:'4px 6px',borderRadius:4}}>
+                        ⚠ {outCnt}대 범위 초과 → 저장 시 자동 재배치
+                      </div>
+                    ) : null;
+                  })()}
+                  <div style={{display:'flex',gap:6,marginTop:8}}>
+                    <button className="btn btn-primary" style={{padding:'3px 10px',fontSize:11}} onClick={(e) => saveEdit(l.lab_id, e)}>저장</button>
+                    <button className="btn btn-outline" style={{padding:'3px 10px',fontSize:11}} onClick={(e) => { e.stopPropagation(); setEditingId(null); }}>취소</button>
+                    <button className="btn btn-danger" style={{padding:'3px 10px',fontSize:11,marginLeft:'auto'}}
+                      onClick={(e) => { e.stopPropagation(); if(window.confirm(`"${l.lab_name}" 삭제? PC도 모두 삭제됩니다.`)) { onDelete(l.lab_id); setEditingId(null); if(adminLab===l.lab_id) setAdminLab(null); } }}>
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="lab-add-form">
+        <h4>+ 검사실 추가</h4>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          <input value={name} onChange={e=>setName(e.target.value)} placeholder="검사실 이름"
+            style={{padding:'5px 8px',border:'1px solid #dadce0',borderRadius:4,fontSize:13}} />
+          <div className="grid-inputs">
+            <span>행</span>
+            <input type="number" className="grid-num-input" value={rows} onChange={e=>setRows(Math.max(1,+e.target.value))} min={1} max={30} />
+            <span>× 열</span>
+            <input type="number" className="grid-num-input" value={cols} onChange={e=>setCols(Math.max(1,+e.target.value))} min={1} max={30} />
+          </div>
+          <button className="btn btn-primary" style={{fontSize:12}} onClick={() => { if(name.trim()){ onAdd(name,rows,cols); setName(''); }}}>추가</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PCs Admin ──
+function PcsAdmin({ labs, pcs, scores, adminLab, setAdminLab, onMovePc, onMovePcs, onDeletePc, onUpdatePc, addPcCell, onAddPcAt, onSubmitAddPc, onCancelAdd, onDragPcStart, onDragPcEnd, isReadOnly }) {
+  const [selPcs, setSelPcs] = useState([]);
+  const [editPc, setEditPc] = useState(null);
+  const [editIp, setEditIp] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editLoc, setEditLoc] = useState('');
+  const [editDet, setEditDet] = useState('');
+  const [newIp, setNewIp] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newLoc, setNewLoc] = useState('');
+  const [newDet, setNewDet] = useState('');
+  const [newMemo, setNewMemo] = useState('');
+
+  const lab = labs.find(l => l.lab_id === adminLab) || null;
+  useEffect(() => { if (!adminLab && labs.length) setAdminLab(labs[0].lab_id); }, [labs, adminLab]);
+  const labPcsList = pcs.filter(p => p.lab_id === lab?.lab_id);
+
+  const [memoEditId, setMemoEditId] = useState(null);
+
+  const handlePcClick = (pc, e) => {
+    if (e && (e.ctrlKey || e.metaKey)) {
+      setSelPcs(prev => {
+        const exists = prev.some(p => p.pc_id === pc.pc_id);
+        return exists ? prev.filter(p => p.pc_id !== pc.pc_id) : [...prev, pc];
+      });
+    } else {
+      setSelPcs([pc]);
+      setEditPc(pc);
+      setEditIp(pc.ip_address);
+      setEditName(pc.pc_name || '');
+      setEditLoc(pc.location || '');
+      setEditDet(pc.detail || '');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    for (const pc of selPcs) {
+      await onDeletePc(pc.pc_id);
+    }
+    setSelPcs([]);
+    setEditPc(null);
+  };
+
+  if (!lab) return <div style={{padding:24,color:'#5f6368',fontSize:13}}>← 왼쪽에서 검사실을 선택하세요.</div>;
+
+  const singleSel = selPcs.length === 1 ? selPcs[0] : null;
+
+  const handleDblClick = (pc) => {
+    setMemoEditId(pc.pc_id);
+  };
+
+  const handleMemoSave = async (pcId, memo) => {
+    await onUpdatePc(pcId, { memo });
+    setMemoEditId(null);
+  };
+
+  return (
+    <>
+      <div className="admin-section">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <h3>PC 배치 — {lab ? lab.lab_name : '검사실 미선택'}</h3>
+        </div>
+        <div style={{fontSize:11,color:'#5f6368',marginBottom:12}}>
+          {isReadOnly
+            ? '조회 전용 — 이 검사실은 담당 검사실이 아닙니다'
+            : '드래그=이동 · 좌측 검사실로 드래그=검사실 이동 · 빈 셀 클릭=추가 · Ctrl+클릭=다중선택 · 더블클릭=메모 편집'}
+        </div>
+
+        {selPcs.length > 1 && !isReadOnly && (
+          <div style={{marginBottom:12,padding:'8px 12px',background:'#E5F2F3',borderRadius:6,display:'flex',alignItems:'center',gap:12,fontSize:12}}>
+            <span style={{color:'#006272',fontWeight:600}}>{selPcs.length}개 선택됨</span>
+            <span style={{color:'#5f6368'}}>드래그로 일괄 이동 가능</span>
+            <button className="btn btn-danger" style={{padding:'3px 10px',fontSize:11}} onClick={handleDeleteSelected}>선택 삭제</button>
+            <button className="btn btn-outline" style={{padding:'3px 10px',fontSize:11}} onClick={() => { setSelPcs([]); setEditPc(null); }}>선택 해제</button>
+          </div>
+        )}
+
+        <Grid lab={lab} pcs={labPcsList} scores={scores} size={80} showLabel={true}
+              isAdmin={!isReadOnly} selectedPc={singleSel} selectedPcs={selPcs}
+              onPcClick={handlePcClick}
+              onDblClick={handleDblClick}
+              onMovePc={onMovePc}
+              onMovePcs={onMovePcs}
+              onAddPcAt={onAddPcAt}
+              onDragPcStart={onDragPcStart}
+              onDragPcEnd={onDragPcEnd} />
+
+        {memoEditId && (() => {
+          const memoPc = labPcsList.find(p => p.pc_id === memoEditId);
+          if (!memoPc) return null;
+          return (
+            <div style={{marginTop:12,padding:16,background:'#FFF8F0',border:'1px solid #F5D4B8',borderRadius:8}}>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:'#E87722'}}>메모 편집 — {memoPc.ip_address}</div>
+              <textarea id="memo-textarea" defaultValue={memoPc.memo || memoPc.ip_address}
+                style={{width:'100%',border:'1px solid #dadce0',borderRadius:4,padding:'8px 10px',fontSize:13,resize:'vertical',minHeight:60,outline:'none',fontFamily:'inherit'}} autoFocus />
+              <div style={{display:'flex',gap:8,marginTop:8}}>
+                <button className="btn btn-primary" onClick={() => { const v = document.getElementById('memo-textarea').value; handleMemoSave(memoEditId, v); }}>저장</button>
+                <button className="btn btn-outline" onClick={() => setMemoEditId(null)}>취소</button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {addPcCell && (
+          <div style={{marginTop:16,padding:16,background:'#e8f0fe',borderRadius:8}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>PC 추가 (행{addPcCell.row+1} 열{addPcCell.col+1})</div>
+            <div className="form-row">
+              <div className="form-group"><label>IP</label><input value={newIp} onChange={e=>{setNewIp(e.target.value); if(!newMemo || newMemo===newIp) setNewMemo(e.target.value);}} placeholder="172.22.45.xxx" /></div>
+              <div className="form-group"><label>PC명</label><input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="홍길동 / 개인" /></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label>설치위치</label><input value={newLoc} onChange={e=>setNewLoc(e.target.value)} placeholder="/병리과 검사실" /></div>
+              <div className="form-group"><label>세부위치</label><input value={newDet} onChange={e=>setNewDet(e.target.value)} /></div>
+            </div>
+            <div className="form-row">
+              <button className="btn btn-primary" onClick={() => { onSubmitAddPc(newIp,newName,newLoc,newDet,newMemo); setNewIp(''); setNewName(''); setNewLoc(''); setNewDet(''); setNewMemo(''); }}>추가</button>
+              <button className="btn btn-outline" onClick={onCancelAdd}>취소</button>
+            </div>
+          </div>
+        )}
+
+        {editPc && !addPcCell && !memoEditId && selPcs.length <= 1 && (
+          <div style={{marginTop:16,padding:16,background:'#f8f9fa',borderRadius:8}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>선택: {editPc.ip_address}</div>
+            <div className="form-row">
+              <div className="form-group"><label>IP</label><input value={editIp} onChange={e=>setEditIp(e.target.value)} /></div>
+              <div className="form-group"><label>PC명</label><input value={editName} onChange={e=>setEditName(e.target.value)} /></div>
+              <div className="form-group"><label>설치위치</label><input value={editLoc} onChange={e=>setEditLoc(e.target.value)} /></div>
+              <div className="form-group"><label>세부위치</label><input value={editDet} onChange={e=>setEditDet(e.target.value)} /></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:8}}>
+              <button className="btn btn-primary" onClick={() => { onUpdatePc(editPc.pc_id, {ip_address:editIp,pc_name:editName,location:editLoc,detail:editDet}); setEditPc(null); setSelPcs([]); }}>저장</button>
+              <button className="btn btn-danger" onClick={() => { onDeletePc(editPc.pc_id); setEditPc(null); setSelPcs([]); }}>삭제</button>
+              <button className="btn btn-outline" onClick={() => { setEditPc(null); setSelPcs([]); }}>닫기</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── Reset Admin ──
+function ResetAdmin({ onDone, showToast, inline }) {
+  const ref = useRef(null);
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(API + '/import-excel', { method: 'POST', body: fd });
+    const data = await r.json();
+    showToast(`${data.labs}개 검사실, ${data.pcs}대 PC 재등록`);
+    onDone();
+    e.target.value = '';
+  };
+  if (inline) {
+    return (
+      <div>
+        <button className="btn btn-danger" style={{fontSize:12}} onClick={() => ref.current?.click()}>⚠ 엑셀 재등록 (초기화)</button>
+        <input ref={ref} type="file" accept=".xlsx,.xls" onChange={handleUpload} style={{display:'none'}} />
+      </div>
+    );
+  }
+  return (
+    <div className="admin-section">
+      <h3>데이터 초기화</h3>
+      <p style={{fontSize:12,color:'#5f6368',marginBottom:12}}>
+        정보보호실 엑셀을 다시 업로드하면 모든 검사실/PC가 재등록됩니다.<br/>
+        ⚠️ 수동으로 조정한 PC 위치가 초기화됩니다.
+      </p>
+      <button className="btn btn-danger" onClick={() => ref.current?.click()}>엑셀 업로드 후 재등록</button>
+      <input ref={ref} type="file" accept=".xlsx,.xls" onChange={handleUpload} style={{display:'none'}} />
+    </div>
+  );
+}
+
+// ── Login Page ──
+function LoginPage({ onLogin }) {
+  const [userId, setUserId] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!userId.trim() || !password.trim()) { setError('사번과 비밀번호를 입력하세요'); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await fetch(API + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, password })
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.detail || '로그인 실패'); setLoading(false); return; }
+      localStorage.setItem('token', data.token);
+      onLogin(data);
+    } catch(e) {
+      setError('서버 연결에 실패했습니다');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#f8f9fa'}}>
+      <div style={{background:'#fff',borderRadius:16,padding:'48px 40px',width:360,boxShadow:'0 4px 24px rgba(0,0,0,0.10)'}}>
+        <div style={{textAlign:'center',marginBottom:32}}>
+          <div style={{fontSize:32,marginBottom:12}}>🔒</div>
+          <h1 style={{fontSize:20,fontWeight:700,color:'#006272',marginBottom:4}}>보안점수 관리 시스템</h1>
+          <p style={{fontSize:13,color:'#80868b'}}>서울아산병원 병리과</p>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <div>
+            <label style={{fontSize:12,color:'#5f6368',marginBottom:4,display:'block'}}>사번</label>
+            <input value={userId} onChange={e=>setUserId(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+              placeholder="사번을 입력하세요"
+              style={{width:'100%',padding:'10px 12px',border:'1px solid #dadce0',borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box'}} />
+          </div>
+          <div>
+            <label style={{fontSize:12,color:'#5f6368',marginBottom:4,display:'block'}}>비밀번호</label>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+              placeholder="비밀번호를 입력하세요"
+              style={{width:'100%',padding:'10px 12px',border:'1px solid #dadce0',borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box'}} />
+          </div>
+          {error && <div style={{fontSize:12,color:'#E87722',background:'#FFF3EB',padding:'8px 12px',borderRadius:6}}>{error}</div>}
+          <button onClick={handleSubmit} disabled={loading}
+            style={{width:'100%',padding:'11px',background:'#006272',color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',marginTop:4,opacity:loading?0.7:1}}>
+            {loading ? '로그인 중...' : '로그인'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Users Admin ──
+function UsersAdmin({ labs, showToast }) {
+  const [users, setUsers] = useState([]);
+  const [form, setForm] = useState({ user_id:'', username:'', password:'', role:'user', lab_id:'' });
+  const [editUser, setEditUser] = useState(null);
+  const [editForm, setEditForm] = useState({});
+
+  const loadUsers = () => api('/users').then(d => { if(d) setUsers(d); });
+  useEffect(() => { loadUsers(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.user_id.trim() || !form.username.trim() || !form.password.trim()) {
+      showToast('사번, 이름, 비밀번호를 모두 입력하세요'); return;
+    }
+    try {
+      await api('/users', { method:'POST', body: JSON.stringify(form) });
+      showToast('사용자 추가됨');
+      setForm({ user_id:'', username:'', password:'', role:'user', lab_id:'' });
+      loadUsers();
+    } catch(e) { showToast(`⚠ ${e.detail || '추가 실패'}`); }
+  };
+
+  const handleUpdate = async (userId) => {
+    const payload = {};
+    if (editForm.username) payload.username = editForm.username;
+    if (editForm.password) payload.password = editForm.password;
+    if (editForm.role) payload.role = editForm.role;
+    payload.lab_id = editForm.lab_id || null;
+    await api(`/users/${userId}`, { method:'PUT', body: JSON.stringify(payload) });
+    showToast('저장됨'); setEditUser(null); loadUsers();
+  };
+
+  const handleDelete = async (userId) => {
+    if (!window.confirm(`"${userId}" 계정을 삭제합니까?`)) return;
+    await api(`/users/${userId}`, { method:'DELETE' });
+    showToast('삭제됨'); loadUsers();
+  };
+
+  return (
+    <div>
+      <h2>👤 사용자 관리</h2>
+      <div className="subtitle">검사실 담당자 계정을 등록하고 권한을 설정합니다</div>
+
+      {/* 사용자 목록 */}
+      <div className="admin-section" style={{marginTop:16}}>
+        <h3>계정 목록</h3>
+        <table className="data">
+          <thead><tr><th>사번</th><th>이름</th><th>권한</th><th>담당 검사실</th><th></th></tr></thead>
+          <tbody>
+            {users.map(u => (
+              <tr key={u.user_id}>
+                {editUser === u.user_id ? (
+                  <>
+                    <td style={{fontFamily:'monospace',fontSize:12}}>{u.user_id}</td>
+                    <td><input value={editForm.username||''} onChange={e=>setEditForm({...editForm,username:e.target.value})}
+                      style={{width:90,padding:'3px 6px',border:'1px solid #dadce0',borderRadius:4,fontSize:12}} /></td>
+                    <td>
+                      <select value={editForm.role||'user'} onChange={e=>setEditForm({...editForm,role:e.target.value})}
+                        style={{padding:'3px 6px',border:'1px solid #dadce0',borderRadius:4,fontSize:12}}>
+                        <option value="user">일반</option>
+                        <option value="admin">관리자</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select value={editForm.lab_id||''} onChange={e=>setEditForm({...editForm,lab_id:e.target.value})}
+                        style={{padding:'3px 6px',border:'1px solid #dadce0',borderRadius:4,fontSize:12}}>
+                        <option value="">미지정</option>
+                        {labs.map(l => <option key={l.lab_id} value={l.lab_id}>{l.lab_name}</option>)}
+                      </select>
+                    </td>
+                    <td style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                      <input placeholder="새 비밀번호(선택)" value={editForm.password||''} onChange={e=>setEditForm({...editForm,password:e.target.value})}
+                        style={{width:110,padding:'3px 6px',border:'1px solid #dadce0',borderRadius:4,fontSize:11}} />
+                      <button className="btn btn-primary" style={{padding:'3px 8px',fontSize:11}} onClick={()=>handleUpdate(u.user_id)}>저장</button>
+                      <button className="btn btn-outline" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditUser(null)}>취소</button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td style={{fontFamily:'monospace',fontSize:12}}>{u.user_id}</td>
+                    <td>{u.username}</td>
+                    <td><span style={{background:u.role==='admin'?'#e8f0fe':'#f1f3f4',color:u.role==='admin'?'#1a73e8':'#5f6368',padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:600}}>
+                      {u.role==='admin'?'관리자':'일반'}
+                    </span></td>
+                    <td style={{fontSize:12,color:'#5f6368'}}>{labs.find(l=>l.lab_id===u.lab_id)?.lab_name || (u.role==='admin'?'전체':'-')}</td>
+                    <td style={{display:'flex',gap:4}}>
+                      <button className="btn btn-outline" style={{padding:'3px 8px',fontSize:11}}
+                        onClick={()=>{ setEditUser(u.user_id); setEditForm({username:u.username,role:u.role,lab_id:u.lab_id||'',password:''}); }}>수정</button>
+                      {u.user_id !== 'admin' && <button className="btn btn-danger" style={{padding:'3px 8px',fontSize:11}} onClick={()=>handleDelete(u.user_id)}>삭제</button>}
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 사용자 추가 */}
+      <div className="admin-section">
+        <h3>계정 추가</h3>
+        <div className="form-row">
+          <div className="form-group"><label>사번</label><input value={form.user_id} onChange={e=>setForm({...form,user_id:e.target.value})} placeholder="20250001" /></div>
+          <div className="form-group"><label>이름</label><input value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="홍길동" /></div>
+          <div className="form-group"><label>비밀번호</label><input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="초기 비밀번호" /></div>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>권한</label>
+            <select value={form.role} onChange={e=>setForm({...form,role:e.target.value})} style={{padding:'6px 10px',border:'1px solid #dadce0',borderRadius:4,fontSize:13}}>
+              <option value="user">일반 (담당 검사실만)</option>
+              <option value="admin">관리자 (전체)</option>
+            </select>
+          </div>
+          {form.role === 'user' && (
+            <div className="form-group">
+              <label>담당 검사실</label>
+              <select value={form.lab_id} onChange={e=>setForm({...form,lab_id:e.target.value})} style={{padding:'6px 10px',border:'1px solid #dadce0',borderRadius:4,fontSize:13}}>
+                <option value="">선택</option>
+                {labs.map(l => <option key={l.lab_id} value={l.lab_id}>{l.lab_name}</option>)}
+              </select>
+            </div>
+          )}
+          <button className="btn btn-primary" style={{alignSelf:'flex-end'}} onClick={handleCreate}>추가</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
