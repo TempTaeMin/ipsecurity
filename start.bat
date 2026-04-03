@@ -17,9 +17,9 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') 
 )
 
 echo  [3] Starting server...
-echo  [4] Open http://localhost:8000
+echo  [4] Open http://localhost:8001
 echo.
 
-uvicorn server:app --host 0.0.0.0 --port 8000
+uvicorn server:app --host 0.0.0.0 --port 8001
 
 pause
